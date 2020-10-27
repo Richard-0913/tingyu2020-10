@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       https://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/tx
+       http://www.springframework.org/schema/tx/spring-tx.xsd
+       http://www.springframework.org/schema/aop
+       https://www.springframework.org/schema/aop/spring-aop.xsd
+">
+    <!-- 扫描 -->
+    <context:component-scan base-package="com.jutixueyuan"/>
+
+    <!-- 引入db文件 配置数据库连接池 -->
+    <context:property-placeholder location="classpath:db.properties"/>
+
+    <!-- 配置 数据库连接池 -->
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource"
+          init-method="init" destroy-method="close">
+        <property name="driverClassName" value="${jdbc.driverClassName}"/>
+        <property name="url" value="${jdbc.url}"/>
+        <property name="username" value="${jdbc.username}"/>
+        <property name="password" value="${jdbc.password}"/>
+        <property name="maxActive" value="${jdbc.maxActive}"/>
+    </bean>
+
+    <!-- 集成配置MyBatis -->
+    <bean id="sqlSessionFactory" class="com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean">
+
+        <!-- 数据库连接 -->
+        <property name="dataSource" ref="dataSource"/>
+
+        <!-- 配置mp的分页插件 -->
+        <property name="plugins">
+            <array>
+                <!-- 配置分页插件:拦截对象 -->
+                <bean class="com.baomidou.mybatisplus.extension.plugins.PaginationInterceptor">
+                    <property name="dialectType" value="MYSQL"></property>
+                    <!-- 指明要进行分页操作的数据库 -->
+                </bean>
+            </array>
+        </property>
+
+        <!-- 配置日志输出 -->
+        <property name="configuration">
+            <bean class="com.baomidou.mybatisplus.core.MybatisConfiguration">
+                <property name="logImpl" value="org.apache.ibatis.logging.stdout.StdOutImpl"/>
+            </bean>
+        </property>
+
+    </bean>
+
+    <!-- 把mapper注入到ioc容器中 -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <!-- 把mapper直接扫描注入到ioc容器中 默认id是首字母小写 -->
+        <property name="basePackage" value="com.jutixueyuan.mapper"/>
+        <!-- 通过获取sqlsession获取mapper代理对象 -->
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+    </bean>
+
+    <!-- 事务的整合 配置事务管理器 -->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <!-- 注入数据源 -->
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+    <!-- spring事务配置 -->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <!-- 事务属性配置 -->
+        <tx:attributes>
+            <!-- DQL ：查询操作，配置只读事务 -->
+            <tx:method name="get*" read-only="true"/>
+            <tx:method name="select*" read-only="true"/>
+            <tx:method name="find*" read-only="true"/>
+            <tx:method name="query*" read-only="true"/>
+
+            <!-- DML ：非只读事务 -->
+            <tx:method name="*" read-only="false" isolation="REPEATABLE_READ"  propagation="REQUIRED"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <!-- 配置AOP 切入事务 -->
+    <aop:config>
+        <!-- 切入点 -->
+        <aop:pointcut expression="execution(* com.jutixueyuan.service..*.*(..))" id="pt"/>
+
+        <!-- 切面 -->
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="pt"/>
+    </aop:config>
+</beans>
